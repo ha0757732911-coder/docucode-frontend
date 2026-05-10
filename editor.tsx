@@ -4,17 +4,14 @@ import { Upload, Eraser, Download, Check, X, Loader2, Sparkles } from "lucide-re
 import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { sampleCode, documentedCode, highlightPython } from "@/lib/mock";
+import { highlightPython } from "@/lib/mock";
 import { toast } from "sonner";
+import { API, getToken } from "@/lib/auth";
 
 export const Route = createFileRoute("/editor")({
-  head: () => ({ meta: [{ title: "Editor — DocuCode" }, { name: "description", content: "AI-powered Python documentation editor." }] }),
+  head: () => ({ meta: [{ title: "Editor — DocuCode" }] }),
   component: EditorPage,
 });
 
@@ -28,23 +25,68 @@ function buildDiff(orig: string, doc: string): Diff {
   }));
 }
 
+const SAMPLE = `def fibonacci(n):
+    if n <= 1:
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+
+def is_prime(num):
+    if num < 2:
+        return False
+    for i in range(2, int(num ** 0.5) + 1):
+        if num % i == 0:
+            return False
+    return True
+
+
+class Calculator:
+    def __init__(self):
+        self.result = 0
+
+    def add(self, x, y):
+        return x + y
+`;
+
 function EditorPage() {
-  const [code, setCode] = useState(sampleCode);
+  const [code, setCode] = useState(SAMPLE);
   const [style, setStyle] = useState("pep257");
+  const [fileName, setFileName] = useState("code.py");
   const [diff, setDiff] = useState<Diff | null>(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState<"split" | "unified">("split");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const generate = () => {
+  const generate = async () => {
     if (!code.trim()) { toast.error("Please enter some code first"); return; }
+
+    const token = getToken();
+    if (!token) { toast.error("Please log in to generate documentation"); return; }
+
     setLoading(true);
     setDiff(null);
-    setTimeout(() => {
-      setDiff(buildDiff(code, documentedCode));
+
+    try {
+      const res = await fetch(`${API}/api/document`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code, style, fileName }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate");
+
+      setDiff(buildDiff(code, data.documentedCode));
+      toast.success("Documentation generated!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      toast.error(msg);
+    } finally {
       setLoading(false);
-      toast.success("Documentation generated");
-    }, 1200);
+    }
   };
 
   const acceptAll = () => {
@@ -68,14 +110,15 @@ function EditorPage() {
     const blob = new Blob([finalCode], { type: "text/x-python" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "documented.py"; a.click();
+    a.href = url; a.download = fileName.replace(".py", "_documented.py"); a.click();
     URL.revokeObjectURL(url);
-    toast.success("Downloaded documented.py");
+    toast.success("Downloaded!");
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
+    setFileName(f.name);
     const r = new FileReader();
     r.onload = () => { setCode(String(r.result || "")); toast.success(`Loaded ${f.name}`); };
     r.readAsText(f);
@@ -88,7 +131,7 @@ function EditorPage() {
       <Navbar />
       <div className="mx-auto max-w-[1400px] px-4 py-6">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* LEFT */}
+          {/* LEFT — Original Code */}
           <div className="flex flex-col rounded-xl border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <h2 className="text-sm font-semibold text-navy">Original Code</h2>
@@ -110,7 +153,6 @@ function EditorPage() {
                 <Eraser className="mr-2 h-4 w-4" /> Clear
               </Button>
             </div>
-
             <div className="code-editor relative flex min-h-[400px] flex-1 overflow-auto">
               <div className="select-none border-r border-white/10 bg-black/20 px-3 py-3 text-right text-xs leading-relaxed text-white/40">
                 {lines.map((_, i) => <div key={i}>{i + 1}</div>)}
@@ -123,16 +165,15 @@ function EditorPage() {
                 style={{ minHeight: 400 }}
               />
             </div>
-
             <div className="border-t p-3">
               <Button onClick={generate} disabled={loading} className="w-full bg-brand hover:bg-brand/90 text-brand-foreground" size="lg">
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                Generate Documentation
+                {loading ? "Generating..." : "Generate Documentation"}
               </Button>
             </div>
           </div>
 
-          {/* RIGHT */}
+          {/* RIGHT — Documented Code */}
           <div className="flex flex-col rounded-xl border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b px-4 py-2">
               <h2 className="text-sm font-semibold text-navy">Documented Code</h2>
@@ -150,7 +191,6 @@ function EditorPage() {
                 <button onClick={() => setView("unified")} className={`px-3 py-1 text-xs ${view === "unified" ? "bg-navy text-white" : "bg-background"}`}>Unified</button>
               </div>
             </div>
-
             <div className="code-editor relative flex min-h-[400px] flex-1 overflow-auto">
               {loading ? (
                 <div className="flex w-full items-center justify-center text-white/70">
@@ -158,7 +198,7 @@ function EditorPage() {
                 </div>
               ) : !diff ? (
                 <div className="flex w-full items-center justify-center px-6 text-center text-white/40">
-                  Your documented code will appear here
+                  Your documented code will appear here after you click Generate
                 </div>
               ) : (
                 <div className="w-full">
@@ -168,10 +208,7 @@ function EditorPage() {
                       className={`group flex items-center gap-2 px-3 ${d.added && !d.rejected ? "bg-[#C6EFC8]/90 text-[#0a3]" : ""} ${d.rejected ? "bg-destructive/10 line-through opacity-60" : ""}`}
                     >
                       <span className="w-8 select-none text-right text-xs text-white/30">{i + 1}</span>
-                      <pre
-                        className="flex-1 whitespace-pre-wrap"
-                        dangerouslySetInnerHTML={{ __html: highlightPython(d.text || " ") }}
-                      />
+                      <pre className="flex-1 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: highlightPython(d.text || " ") }} />
                       {d.added && (
                         <div className="flex shrink-0 gap-1 opacity-0 transition group-hover:opacity-100">
                           <button onClick={() => toggleLine(i)} className="rounded bg-green-600 p-0.5 text-white" title="Accept">
