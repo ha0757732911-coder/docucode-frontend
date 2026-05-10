@@ -4,29 +4,40 @@ import { Code2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/lib/auth";
+import { apiLogin, useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Login — DocuCode" }, { name: "description", content: "Sign in to DocuCode." }] }),
+  head: () => ({ meta: [{ title: "Login — DocuCode" }] }),
   component: LoginPage,
 });
 
 function LoginPage() {
-  const { login, loginGuest } = useAuth();
+  const { loginGuest } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: typeof errors = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) errs.email = "Enter a valid email";
     if (password.length < 6) errs.password = "Password must be 6+ characters";
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    login(email);
+
+    setLoading(true);
+    const error = await apiLogin(email, password);
+    setLoading(false);
+
+    if (error) {
+      setErrors({ general: error });
+      toast.error(error);
+      return;
+    }
+
     toast.success("Welcome back!");
     navigate({ to: "/editor" });
   };
@@ -42,6 +53,9 @@ function LoginPage() {
           <p className="text-sm text-muted-foreground">Sign in to your account</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
+          {errors.general && (
+            <p className="rounded bg-destructive/10 p-2 text-center text-sm text-destructive">{errors.general}</p>
+          )}
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -52,7 +66,9 @@ function LoginPage() {
             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" />
             {errors.password && <p className="mt-1 text-xs text-destructive">{errors.password}</p>}
           </div>
-          <Button type="submit" className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">Login</Button>
+          <Button type="submit" disabled={loading} className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">
+            {loading ? "Logging in..." : "Login"}
+          </Button>
         </form>
         <button
           type="button"
