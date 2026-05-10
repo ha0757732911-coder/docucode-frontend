@@ -4,23 +4,23 @@ import { Code2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAuth } from "@/lib/auth";
+import { apiRegister } from "@/lib/auth";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/register")({
-  head: () => ({ meta: [{ title: "Register — DocuCode" }, { name: "description", content: "Create a DocuCode account." }] }),
+  head: () => ({ meta: [{ title: "Register — DocuCode" }] }),
   component: RegisterPage,
 });
 
 function RegisterPage() {
-  const { login } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs: Record<string, string> = {};
     if (!/^\S+@\S+\.\S+$/.test(email)) errs.email = "Enter a valid email";
@@ -28,8 +28,18 @@ function RegisterPage() {
     if (password !== confirm) errs.confirm = "Passwords don't match";
     setErrors(errs);
     if (Object.keys(errs).length) return;
-    login(email);
-    toast.success("Account created!");
+
+    setLoading(true);
+    const error = await apiRegister(email, password);
+    setLoading(false);
+
+    if (error) {
+      setErrors({ general: error });
+      toast.error(error);
+      return;
+    }
+
+    toast.success("Account created! Welcome to DocuCode!");
     navigate({ to: "/editor" });
   };
 
@@ -44,6 +54,9 @@ function RegisterPage() {
           <p className="text-sm text-muted-foreground">Create your account</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
+          {errors.general && (
+            <p className="rounded bg-destructive/10 p-2 text-center text-sm text-destructive">{errors.general}</p>
+          )}
           <div>
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
@@ -59,7 +72,9 @@ function RegisterPage() {
             <Input id="confirm" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="••••••••" />
             {errors.confirm && <p className="mt-1 text-xs text-destructive">{errors.confirm}</p>}
           </div>
-          <Button type="submit" className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">Register</Button>
+          <Button type="submit" disabled={loading} className="w-full bg-brand hover:bg-brand/90 text-brand-foreground">
+            {loading ? "Creating account..." : "Register"}
+          </Button>
         </form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account? <Link to="/login" className="font-medium text-brand hover:underline">Login</Link>
