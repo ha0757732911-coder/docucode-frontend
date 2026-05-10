@@ -1,8 +1,5 @@
 {
   "name": "docucode-app",
-  "main": "dist/server/server.js",
-  "compatibility_date": "2026-05-10",
-  "assets": {
-    "directory": "./dist/client"
-  }
+  "main": "src/server.ts",
+  "compatibility_date": "2026-05-10"
 }
