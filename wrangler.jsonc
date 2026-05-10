@@ -1,6 +1,8 @@
 {
-  "name": "docucode-frontend",
-  "compatibility_date": "2024-12-18",
-  "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": ".output/public"
+  "name": "docucode-app",
+  "main": "dist/server/server.js",
+  "compatibility_date": "2026-05-10",
+  "assets": {
+    "directory": "./dist/client"
+  }
 }
