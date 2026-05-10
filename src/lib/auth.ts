@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 //WORKER_URL=docucode-api.ha0757732911.workers.dev
-const API = "https://docucode-app.ha0757732911.workers.dev";
+const API = "https://docucode-api.ha0757732911.workers.dev";
 
 export type User = {
   email: string;
